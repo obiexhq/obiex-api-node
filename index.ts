@@ -19,32 +19,7 @@ export class ObiexClient {
     this.client.interceptors.request.use((c) => this.requestConfig(c));
   }
 
-  /**
-   * NOTE: The array conversion logic is different from usual query string.
-   * E.g. symbols=["BTCUSDT","BNBBTC"] instead of symbols[]=BTCUSDT&symbols[]=BNBBTC
-   */
-  stringifyKeyValuePair = ([key, value]) => {
-    const valueString = Array.isArray(value)
-      ? `["${value.join('","')}"]`
-      : value;
-    return `${key}=${encodeURIComponent(valueString)}`;
-  };
-
-  buildQueryString = (params) => {
-    if (!params) return "";
-
-    return Object.entries(params).map(this.stringifyKeyValuePair).join("&");
-  };
-
   private requestConfig(requestConfig: AxiosRequestConfig) {
-    const url = requestConfig.url;
-
-    if (requestConfig.params) {
-      requestConfig.url =
-        url + "?" + this.buildQueryString(requestConfig.params);
-      requestConfig.params = null;
-    }
-
     const { timestamp, signature } = this.sign(
       requestConfig.method,
       requestConfig.url
@@ -58,11 +33,10 @@ export class ObiexClient {
     return requestConfig;
   }
 
-  private sign(method: string, url: string) {
+  private sign(method: string, originalUrl: string) {
     const timestamp = Date.now();
-    const path = url.startsWith("/") ? url : `/${url}`;
 
-    const content = `${method.toUpperCase()}/v1${path}${timestamp}`;
+    const content = `${method.toUpperCase()}${originalUrl}${timestamp}`;
 
     const signature = createHmac("sha256", this.apiSecret)
       .update(content)
