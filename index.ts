@@ -1,6 +1,7 @@
 import axios, { AxiosInstance, AxiosRequestConfig } from "axios";
 import { createHmac } from "crypto";
 import { CacheService } from "./cache";
+import { ServerError } from "./errors/server";
 import { Options } from "./types";
 
 export class ObiexClient {
@@ -21,6 +22,16 @@ export class ObiexClient {
     this.client = axios.create({ baseURL });
 
     this.client.interceptors.request.use((c) => this.requestConfig(c));
+    this.client.interceptors.response.use((response) => response, (error) => {
+      if (error.response && error.response.data) {
+        return Promise.reject(new ServerError(
+          error.response.message,
+          error.response.data,
+          error.response.status));
+      }
+
+      return Promise.reject(error);
+    });
 
     this.cacheService = new CacheService();
   }
@@ -268,6 +279,8 @@ export class ObiexClient {
     return currencies.find((x) => x.code === code);
   }
 }
+
+export { ServerError } from './errors/server';
 
 export interface BankAccountPayout {
   accountNumber: string;

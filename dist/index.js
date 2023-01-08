@@ -3,10 +3,11 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.TransactionCategory = exports.ObiexClient = void 0;
+exports.TransactionCategory = exports.ServerError = exports.ObiexClient = void 0;
 const axios_1 = __importDefault(require("axios"));
 const crypto_1 = require("crypto");
 const cache_1 = require("./cache");
+const server_1 = require("./errors/server");
 class ObiexClient {
     constructor({ apiKey, apiSecret, sandboxMode = false }) {
         this.apiKey = apiKey;
@@ -16,6 +17,12 @@ class ObiexClient {
             : "https://api.obiex.finance";
         this.client = axios_1.default.create({ baseURL });
         this.client.interceptors.request.use((c) => this.requestConfig(c));
+        this.client.interceptors.response.use((response) => response, (error) => {
+            if (error.response && error.response.data) {
+                return Promise.reject(new server_1.ServerError(error.response.message, error.response.data, error.response.status));
+            }
+            return Promise.reject(error);
+        });
         this.cacheService = new cache_1.CacheService();
     }
     requestConfig(requestConfig) {
@@ -181,6 +188,8 @@ class ObiexClient {
     }
 }
 exports.ObiexClient = ObiexClient;
+var server_2 = require("./errors/server");
+Object.defineProperty(exports, "ServerError", { enumerable: true, get: function () { return server_2.ServerError; } });
 var TransactionCategory;
 (function (TransactionCategory) {
     TransactionCategory["DEPOSIT"] = "DEPOSIT";
