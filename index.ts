@@ -10,7 +10,7 @@ export class ObiexClient {
 
   private cacheService: CacheService;
 
-  constructor({ apiKey, apiSecret, sandboxMode }: Options) {
+  constructor({ apiKey, apiSecret, sandboxMode = false }: Options) {
     this.apiKey = apiKey;
     this.apiSecret = apiSecret;
 
