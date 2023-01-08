@@ -1,7 +1,7 @@
 {
-  "name": "obiex-api-javascript",
+  "name": "obiex-api",
   "version": "1.0.0",
-  "description": "Obiex node api",
+  "description": "Obiex Node.js API client",
   "main": "dist/index.js",
   "scripts": {
     "build": "rm -rf dist && tsc",
@@ -15,7 +15,7 @@
     "auth",
     "obiex"
   ],
-  "author": "Emmanuel Biolatiri",
+  "author": "Obiex HQ",
   "license": "ISC",
   "bugs": {
     "url": "https://github.com/obiexhq/obiex-api-javascript/issues"

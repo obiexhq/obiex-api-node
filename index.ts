@@ -53,13 +53,34 @@ export class ObiexClient {
     };
   }
 
-  // getDepositAddress(currency: string, identifier: string, isMaster: boolean) defaults: isMaster: false
+  /**
+   * Generate a deposit address for a currency. Re-using the same identifier always returns the same address
+   * @param currency The currency code eg. BTC, USDT
+   * @param identifier A unique identifier you can tie to your users.
+   */
+  async getDepositAddress(currency: string, network: string, identifier: string) {
+    const { data: response } = await this.client.post(`/v1/addresses/broker`, {
+      currency,
+      network,
+      purpose: identifier
+    });
+
+    const { data } = response;
+
+    return {
+      address: data.value,
+      memo: data.memo,
+      network: data.network,
+      identifier: data.purpose
+    };
+  }
 
   async getTradePairs() {
     const { data } = await this.client.get("/v1/trades/pairs");
 
     return data;
   }
+
   async getTradePairsByCurrency(currencyId: string) {
     const { data } = await this.client.get(
       `/v1/currencies/${currencyId}/pairs`
@@ -68,15 +89,26 @@ export class ObiexClient {
     return data;
   }
 
+  /**
+   * Create quote for trade
+   * @param source Left hand side for pair i.e. BTC in BTC/USDT 
+   * @param target Right hand side for trade pair i.e. USDT in BTC/USDT
+   * @param side The trade side i.e. BUY: USDT -> BTC & SELL: BTC -> USDT for BTC/USDT
+   * @param amount The amount you intend to trade
+   * @returns 
+   */
   async createQuote(
-    sourceId: string,
-    targetId: string,
+    source: string,
+    target: string,
     side: "BUY" | "SELL",
     amount: number
   ) {
+    const sourceCurrency = await this.getCurrencyByCode(source);
+    const targetCurrency = await this.getCurrencyByCode(target);
+    
     const { data } = await this.client.post(`/v1/trades/quote`, {
-      sourceId,
-      targetId,
+      sourceId: sourceCurrency.id,
+      targetId: targetCurrency.id,
       side,
       amount,
     });
@@ -84,13 +116,35 @@ export class ObiexClient {
     return data;
   }
 
+  /**
+   * Swap from one currency to another (if you are not interested in verifying prices)
+   * @param source Left hand side for pair i.e. BTC in BTC/USDT 
+   * @param target Right hand side for trade pair i.e. USDT in BTC/USDT
+   * @param side The trade side i.e. BUY: USDT -> BTC & SELL: BTC -> USDT for BTC/USDT
+   * @param amount The amount you intend to trade
+   * @returns 
+   */
+  async trade(
+    source: string,
+    target: string,
+    side: "BUY" | "SELL",
+    amount: number
+  ) {
+    const quote = await this.createQuote(source, target, side, amount);
+    
+    return await this.acceptQuote(quote.id);
+  }
+
+  /**
+   * Accept quote using provided quote ID
+   * @param quoteId Quote ID gotten from createQuote
+   * @returns 
+   */
   async acceptQuote(quoteId: string) {
     const { data } = await this.client.post(`/v1/trades/quote/${quoteId}`);
 
     return data;
   }
-
-  // trade(source: string, target: string, side: 'BUY'|'SELL', amount: number)
 
   async withdrawCrypto(
     currencyCode: string,
@@ -107,13 +161,12 @@ export class ObiexClient {
   }
 
   async withdrawNaira(
-    currencyCode: string,
     amount: number,
     account: BankAccountPayout
   ) {
     const { data } = await this.client.post(`/v1/wallets/ext/debit/fiat`, {
       amount,
-      currency: currencyCode,
+      currency: 'NGNX',
       destination: account,
     });
 
@@ -134,7 +187,7 @@ export class ObiexClient {
 
         return data;
       },
-      604800 //7 days
+      86400 // 24 Hours
     );
   }
 
