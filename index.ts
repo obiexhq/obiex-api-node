@@ -215,7 +215,7 @@ export class ObiexClient {
   }
 
   async getCurrencies() {
-    return this.cacheService.getOrSet(
+    return await this.cacheService.getOrSet(
       "currencies",
       async () => {
         const { data: response } = await this.client.get<Response<Currency[]>>("/v1/currencies");

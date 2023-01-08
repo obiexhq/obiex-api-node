@@ -153,7 +153,7 @@ class ObiexClient {
         return response.data;
     }
     async getCurrencies() {
-        return this.cacheService.getOrSet("currencies", async () => {
+        return await this.cacheService.getOrSet("currencies", async () => {
             const { data: response } = await this.client.get("/v1/currencies");
             return response.data.map(x => ({
                 id: x.id,
