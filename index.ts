@@ -1,15 +1,16 @@
 import axios, { AxiosInstance, AxiosRequestConfig } from "axios";
 import { createHmac } from "crypto";
 import { CacheService } from "./cache";
+import { Options } from "./types";
 
 export class ObiexClient {
   private client: AxiosInstance;
-  apiKey: string;
-  apiSecret: string;
+  private apiKey: string;
+  private apiSecret: string;
 
-  cacheService: CacheService;
+  private cacheService: CacheService;
 
-  constructor(apiKey: string, apiSecret: string, sandboxMode: boolean) {
+  constructor({ apiKey, apiSecret, sandboxMode }: Options) {
     this.apiKey = apiKey;
     this.apiSecret = apiSecret;
 
@@ -105,7 +106,7 @@ export class ObiexClient {
   ) {
     const sourceCurrency = await this.getCurrencyByCode(source);
     const targetCurrency = await this.getCurrencyByCode(target);
-    
+
     const { data } = await this.client.post(`/v1/trades/quote`, {
       sourceId: sourceCurrency.id,
       targetId: targetCurrency.id,
@@ -131,7 +132,7 @@ export class ObiexClient {
     amount: number
   ) {
     const quote = await this.createQuote(source, target, side, amount);
-    
+
     return await this.acceptQuote(quote.id);
   }
 
@@ -228,8 +229,7 @@ export class ObiexClient {
     category?: TransactionCategory
   ) {
     const { data } = await this.client.get(
-      `/v1/transactions/me?page=${page}&pageSize=${pageSize}&category=${
-        category ? category : ""
+      `/v1/transactions/me?page=${page}&pageSize=${pageSize}&category=${category ? category : ""
       }`
     );
 
