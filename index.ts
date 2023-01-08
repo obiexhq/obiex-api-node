@@ -1,22 +1,27 @@
 import axios, { AxiosInstance, AxiosRequestConfig } from "axios";
 import { createHmac } from "crypto";
+import { CacheService } from "./cache";
 
 export class ObiexClient {
   private client: AxiosInstance;
   apiKey: string;
   apiSecret: string;
 
+  cacheService: CacheService;
+
   constructor(apiKey: string, apiSecret: string, sandboxMode: boolean) {
     this.apiKey = apiKey;
     this.apiSecret = apiSecret;
 
     const baseURL = sandboxMode
-      ? "https://staging.api.obiex.finance/v1"
-      : "https://api.obiex.finance/v1";
+      ? "https://staging.api.obiex.finance"
+      : "https://api.obiex.finance";
 
     this.client = axios.create({ baseURL });
 
     this.client.interceptors.request.use((c) => this.requestConfig(c));
+
+    this.cacheService = new CacheService();
   }
 
   private requestConfig(requestConfig: AxiosRequestConfig) {
@@ -51,12 +56,14 @@ export class ObiexClient {
   // getDepositAddress(currency: string, identifier: string, isMaster: boolean) defaults: isMaster: false
 
   async getTradePairs() {
-    const { data } = await this.client.get("/trades/pairs");
+    const { data } = await this.client.get("/v1/trades/pairs");
 
     return data;
   }
   async getTradePairsByCurrency(currencyId: string) {
-    const { data } = await this.client.get(`/currencies/${currencyId}/pairs`);
+    const { data } = await this.client.get(
+      `/v1/currencies/${currencyId}/pairs`
+    );
 
     return data;
   }
@@ -67,7 +74,7 @@ export class ObiexClient {
     side: "BUY" | "SELL",
     amount: number
   ) {
-    const { data } = await this.client.post(`/trades/quote`, {
+    const { data } = await this.client.post(`/v1/trades/quote`, {
       sourceId,
       targetId,
       side,
@@ -78,7 +85,7 @@ export class ObiexClient {
   }
 
   async acceptQuote(quoteId: string) {
-    const { data } = await this.client.post(`/trades/quote/${quoteId}`);
+    const { data } = await this.client.post(`/v1/trades/quote/${quoteId}`);
 
     return data;
   }
@@ -88,18 +95,12 @@ export class ObiexClient {
   async withdrawCrypto(
     currencyCode: string,
     amount: number,
-    walletAddress: string,
-    network: string,
-    memo?: string
+    wallet: CryptoAccountPayout
   ) {
-    const { data } = await this.client.post(`/wallets/ext/debit/crypto`, {
+    const { data } = await this.client.post(`/v1/wallets/ext/debit/crypto`, {
       amount,
       currency: currencyCode,
-      destination: {
-        address: walletAddress,
-        network,
-        memo,
-      },
+      destination: wallet,
     });
 
     return data;
@@ -108,9 +109,9 @@ export class ObiexClient {
   async withdrawNaira(
     currencyCode: string,
     amount: number,
-    account: BankAccount
+    account: BankAccountPayout
   ) {
-    const { data } = await this.client.post(`/wallets/ext/debit/fiat`, {
+    const { data } = await this.client.post(`/v1/wallets/ext/debit/fiat`, {
       amount,
       currency: currencyCode,
       destination: account,
@@ -120,20 +121,28 @@ export class ObiexClient {
   }
 
   async getBanks() {
-    const { data } = await this.client.get("/ngn-payments/banks");
+    const { data } = await this.client.get("/v1/ngn-payments/banks");
 
     return data;
   }
 
   async getCurrencies() {
-    const { data } = await this.client.get("/currencies");
+    return this.cacheService.getOrSet(
+      "currencies",
+      async () => {
+        const { data } = await this.client.get("/v1/currencies");
 
-    return data;
+        return data;
+      },
+      604800 //7 days
+    );
   }
 
-  async getNetworks(currencyId: string) {
+  async getNetworks(currencyCode: string) {
+    const currency = await this.getCurrencyByCode(currencyCode);
+
     const { data } = await this.client.get(
-      `/currencies/${currencyId}/networks`
+      `/v1/currencies/${currency.id}/networks`
     );
 
     return data;
@@ -145,9 +154,9 @@ export class ObiexClient {
    * @param pageSize number // default: 30
    * @returns
    */
-  async getNairaMerchants(page?: number, pageSize?: number) {
+  async getNairaMerchants(page = 1, pageSize = 30) {
     const { data } = await this.client.get(
-      `/ngn-payments/merchants?page$=${page}&pageSize=${pageSize}`
+      `/v1/ngn-payments/merchants?page$=${page}&pageSize=${pageSize}`
     );
 
     return data;
@@ -155,18 +164,20 @@ export class ObiexClient {
 
   /**
    *
-   * @param page number // default: 1
-   * @param pageSize number // default: 30
+   * @param page number
+   * @param pageSize number
    * @param category TransactionCategory
    * @returns
    */
   async getTransactionHistory(
-    page?: number,
-    pageSize?: number,
+    page = 1,
+    pageSize = 30,
     category?: TransactionCategory
   ) {
     const { data } = await this.client.get(
-      `/transactions/me?page=${page}&pageSize=${pageSize}&category=${category}`
+      `/v1/transactions/me?page=${page}&pageSize=${pageSize}&category=${
+        category ? category : ""
+      }`
     );
 
     return data;
@@ -174,20 +185,20 @@ export class ObiexClient {
 
   /**
    *
-   * @param page number // default: 1
-   * @param pageSize number // default: 30
+   * @param page number
+   * @param pageSize number
    * @returns
    */
-  async getTradeHistory(page?: number, pageSize?: number) {
+  async getTradeHistory(page = 1, pageSize = 30) {
     const { data } = await this.client.get(
-      `/trades/me?page=${page}&pageSize=${pageSize}`
+      `/v1/trades/me?page=${page}&pageSize=${pageSize}`
     );
 
     return data;
   }
 
   async getTransactionById(transactionId: string) {
-    const { data } = await this.client.get(`/transactions/${transactionId}`);
+    const { data } = await this.client.get(`/v1/transactions/${transactionId}`);
 
     return data;
   }
@@ -197,15 +208,27 @@ export class ObiexClient {
 
     return trades.find((x) => x.id === tradeId);
   }
+
+  async getCurrencyByCode(code: string) {
+    const currencies = await this.getCurrencies();
+
+    return currencies.find((x) => x.code === code);
+  }
 }
 
-export interface BankAccount {
+export interface BankAccountPayout {
   accountNumber: string;
   accountName: string;
   bankName: string;
   bankCode: string;
   pagaBankCode: string;
   merchantCode: string;
+}
+
+export interface CryptoAccountPayout {
+  address: string;
+  network: string;
+  memo?: string;
 }
 
 export enum TransactionCategory {
