@@ -2,7 +2,7 @@ import axios, { AxiosInstance, AxiosRequestConfig } from "axios";
 import { createHmac } from "crypto";
 import { CacheService } from "./cache";
 import { ServerError } from "./errors/server";
-import { Options } from "./types";
+import { Currency, Network, Options, Quote, Response, TradePair } from "./types";
 
 export class ObiexClient {
   private client: AxiosInstance;
@@ -88,17 +88,29 @@ export class ObiexClient {
   }
 
   async getTradePairs() {
-    const { data } = await this.client.get("/v1/trades/pairs");
+    const { data: response } = await this.client.get<Response<TradePair[]>>("/v1/trades/pairs");
 
-    return data;
+    return response.data.map(x => ({
+      id: x.id,
+      source: x.source.code,
+      target: x.target.code,
+      isBuyable: x.isBuyable,
+      isSellable: x.isSellable,
+    }));
   }
 
   async getTradePairsByCurrency(currencyId: string) {
-    const { data } = await this.client.get(
+    const { data: response } = await this.client.get<Response<TradePair[]>>(
       `/v1/currencies/${currencyId}/pairs`
     );
 
-    return data;
+    return response.data.map(x => ({
+      id: x.id,
+      source: x.source.code,
+      target: x.target.code,
+      isBuyable: x.isBuyable,
+      isSellable: x.isSellable,
+    }));
   }
 
   /**
@@ -118,14 +130,23 @@ export class ObiexClient {
     const sourceCurrency = await this.getCurrencyByCode(source);
     const targetCurrency = await this.getCurrencyByCode(target);
 
-    const { data } = await this.client.post(`/v1/trades/quote`, {
+    const { data: response } = await this.client.post(`/v1/trades/quote`, {
       sourceId: sourceCurrency.id,
       targetId: targetCurrency.id,
       side,
       amount,
     });
 
-    return data;
+    const { data } = response;
+
+    return {
+      id: data.id,
+      rate: data.rate,
+      side: data.side,
+      amount: data.amount,
+      expiryDate: data.expiryDate,
+      amountReceived: data.amountReceived,
+    } satisfies Quote;
   }
 
   /**
@@ -144,7 +165,9 @@ export class ObiexClient {
   ) {
     const quote = await this.createQuote(source, target, side, amount);
 
-    return await this.acceptQuote(quote.id);
+    await this.acceptQuote(quote.id);
+
+    return quote;
   }
 
   /**
@@ -153,9 +176,9 @@ export class ObiexClient {
    * @returns 
    */
   async acceptQuote(quoteId: string) {
-    const { data } = await this.client.post(`/v1/trades/quote/${quoteId}`);
+    await this.client.post(`/v1/trades/quote/${quoteId}`);
 
-    return data;
+    return true;
   }
 
   async withdrawCrypto(
@@ -163,41 +186,51 @@ export class ObiexClient {
     amount: number,
     wallet: CryptoAccountPayout
   ) {
-    const { data } = await this.client.post(`/v1/wallets/ext/debit/crypto`, {
+    const { data: response } = await this.client.post(`/v1/wallets/ext/debit/crypto`, {
       amount,
       currency: currencyCode,
       destination: wallet,
     });
 
-    return data;
+    return response.data;
   }
 
   async withdrawNaira(
     amount: number,
     account: BankAccountPayout
   ) {
-    const { data } = await this.client.post(`/v1/wallets/ext/debit/fiat`, {
+    const { data: response } = await this.client.post(`/v1/wallets/ext/debit/fiat`, {
       amount,
       currency: 'NGNX',
       destination: account,
     });
 
-    return data;
+    return response.data;
   }
 
   async getBanks() {
-    const { data } = await this.client.get("/v1/ngn-payments/banks");
+    const { data: response } = await this.client.get("/v1/ngn-payments/banks");
 
-    return data;
+    return response.data;
   }
 
   async getCurrencies() {
     return this.cacheService.getOrSet(
       "currencies",
       async () => {
-        const { data } = await this.client.get("/v1/currencies");
+        const { data: response } = await this.client.get<Response<Currency[]>>("/v1/currencies");
 
-        return data;
+        return response.data.map(x => ({
+          id: x.id,
+          name: x.name,
+          code: x.code,
+          receivable: x.receivable,
+          withdrawable: x.withdrawable,
+          transferrable: x.transferrable,
+          minimumDeposit: x.minimumDeposit,
+          maximumDailyDeposit: x.maximumDailyDepositLimit,
+          maximumDecimalPlaces: x.maximumDecimalPlaces
+        }));
       },
       86400 // 24 Hours
     );
@@ -206,11 +239,11 @@ export class ObiexClient {
   async getNetworks(currencyCode: string) {
     const currency = await this.getCurrencyByCode(currencyCode);
 
-    const { data } = await this.client.get(
+    const { data: response } = await this.client.get<Response<Network[]>>(
       `/v1/currencies/${currency.id}/networks`
     );
 
-    return data;
+    return response.data;
   }
 
   /**
@@ -220,11 +253,17 @@ export class ObiexClient {
    * @returns
    */
   async getNairaMerchants(page = 1, pageSize = 30) {
-    const { data } = await this.client.get(
-      `/v1/ngn-payments/merchants?page$=${page}&pageSize=${pageSize}`
+    const { data: response } = await this.client.get(
+      `/v1/ngn-payments/merchants`,
+      {
+        params: {
+          page,
+          pageSize
+        }
+      }
     );
 
-    return data;
+    return response.data;
   }
 
   /**
@@ -240,8 +279,13 @@ export class ObiexClient {
     category?: TransactionCategory
   ) {
     const { data } = await this.client.get(
-      `/v1/transactions/me?page=${page}&pageSize=${pageSize}&category=${category ? category : ""
-      }`
+      `/v1/transactions/me`, {
+        params: {
+          page, 
+          pageSize,
+          category
+        }
+      }
     );
 
     return data;
@@ -255,7 +299,13 @@ export class ObiexClient {
    */
   async getTradeHistory(page = 1, pageSize = 30) {
     const { data } = await this.client.get(
-      `/v1/trades/me?page=${page}&pageSize=${pageSize}`
+      `/v1/trades/me`,
+      {
+        params: {
+          page,
+          pageSize
+        }
+      }
     );
 
     return data;
@@ -267,11 +317,11 @@ export class ObiexClient {
     return data;
   }
 
-  async getTradeById(tradeId: string) {
-    const trades = await this.getTradeHistory();
+  //async getTradeById(tradeId: string) {
+    // const trades = await this.getTradeHistory();
 
-    return trades.find((x) => x.id === tradeId);
-  }
+    // return trades.find((x) => x.id === tradeId);
+  //}
 
   async getCurrencyByCode(code: string) {
     const currencies = await this.getCurrencies();
