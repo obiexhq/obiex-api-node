@@ -64,12 +64,24 @@ class ObiexClient {
         };
     }
     async getTradePairs() {
-        const { data } = await this.client.get("/v1/trades/pairs");
-        return data;
+        const { data: response } = await this.client.get("/v1/trades/pairs");
+        return response.data.map(x => ({
+            id: x.id,
+            source: x.source.code,
+            target: x.target.code,
+            isBuyable: x.isBuyable,
+            isSellable: x.isSellable,
+        }));
     }
     async getTradePairsByCurrency(currencyId) {
-        const { data } = await this.client.get(`/v1/currencies/${currencyId}/pairs`);
-        return data;
+        const { data: response } = await this.client.get(`/v1/currencies/${currencyId}/pairs`);
+        return response.data.map(x => ({
+            id: x.id,
+            source: x.source.code,
+            target: x.target.code,
+            isBuyable: x.isBuyable,
+            isSellable: x.isSellable,
+        }));
     }
     /**
      * Create quote for trade
@@ -82,13 +94,21 @@ class ObiexClient {
     async createQuote(source, target, side, amount) {
         const sourceCurrency = await this.getCurrencyByCode(source);
         const targetCurrency = await this.getCurrencyByCode(target);
-        const { data } = await this.client.post(`/v1/trades/quote`, {
+        const { data: response } = await this.client.post(`/v1/trades/quote`, {
             sourceId: sourceCurrency.id,
             targetId: targetCurrency.id,
             side,
             amount,
         });
-        return data;
+        const { data } = response;
+        return {
+            id: data.id,
+            rate: data.rate,
+            side: data.side,
+            amount: data.amount,
+            expiryDate: data.expiryDate,
+            amountReceived: data.amountReceived,
+        };
     }
     /**
      * Swap from one currency to another (if you are not interested in verifying prices)
@@ -100,7 +120,8 @@ class ObiexClient {
      */
     async trade(source, target, side, amount) {
         const quote = await this.createQuote(source, target, side, amount);
-        return await this.acceptQuote(quote.id);
+        await this.acceptQuote(quote.id);
+        return quote;
     }
     /**
      * Accept quote using provided quote ID
@@ -108,40 +129,50 @@ class ObiexClient {
      * @returns
      */
     async acceptQuote(quoteId) {
-        const { data } = await this.client.post(`/v1/trades/quote/${quoteId}`);
-        return data;
+        await this.client.post(`/v1/trades/quote/${quoteId}`);
+        return true;
     }
     async withdrawCrypto(currencyCode, amount, wallet) {
-        const { data } = await this.client.post(`/v1/wallets/ext/debit/crypto`, {
+        const { data: response } = await this.client.post(`/v1/wallets/ext/debit/crypto`, {
             amount,
             currency: currencyCode,
             destination: wallet,
         });
-        return data;
+        return response.data;
     }
     async withdrawNaira(amount, account) {
-        const { data } = await this.client.post(`/v1/wallets/ext/debit/fiat`, {
+        const { data: response } = await this.client.post(`/v1/wallets/ext/debit/fiat`, {
             amount,
             currency: 'NGNX',
             destination: account,
         });
-        return data;
+        return response.data;
     }
     async getBanks() {
-        const { data } = await this.client.get("/v1/ngn-payments/banks");
-        return data;
+        const { data: response } = await this.client.get("/v1/ngn-payments/banks");
+        return response.data;
     }
     async getCurrencies() {
         return this.cacheService.getOrSet("currencies", async () => {
-            const { data } = await this.client.get("/v1/currencies");
-            return data;
+            const { data: response } = await this.client.get("/v1/currencies");
+            return response.data.map(x => ({
+                id: x.id,
+                name: x.name,
+                code: x.code,
+                receivable: x.receivable,
+                withdrawable: x.withdrawable,
+                transferrable: x.transferrable,
+                minimumDeposit: x.minimumDeposit,
+                maximumDailyDeposit: x.maximumDailyDepositLimit,
+                maximumDecimalPlaces: x.maximumDecimalPlaces
+            }));
         }, 86400 // 24 Hours
         );
     }
     async getNetworks(currencyCode) {
         const currency = await this.getCurrencyByCode(currencyCode);
-        const { data } = await this.client.get(`/v1/currencies/${currency.id}/networks`);
-        return data;
+        const { data: response } = await this.client.get(`/v1/currencies/${currency.id}/networks`);
+        return response.data;
     }
     /**
      *
@@ -150,8 +181,13 @@ class ObiexClient {
      * @returns
      */
     async getNairaMerchants(page = 1, pageSize = 30) {
-        const { data } = await this.client.get(`/v1/ngn-payments/merchants?page$=${page}&pageSize=${pageSize}`);
-        return data;
+        const { data: response } = await this.client.get(`/v1/ngn-payments/merchants`, {
+            params: {
+                page,
+                pageSize
+            }
+        });
+        return response.data;
     }
     /**
      *
@@ -161,7 +197,13 @@ class ObiexClient {
      * @returns
      */
     async getTransactionHistory(page = 1, pageSize = 30, category) {
-        const { data } = await this.client.get(`/v1/transactions/me?page=${page}&pageSize=${pageSize}&category=${category ? category : ""}`);
+        const { data } = await this.client.get(`/v1/transactions/me`, {
+            params: {
+                page,
+                pageSize,
+                category
+            }
+        });
         return data;
     }
     /**
@@ -171,17 +213,22 @@ class ObiexClient {
      * @returns
      */
     async getTradeHistory(page = 1, pageSize = 30) {
-        const { data } = await this.client.get(`/v1/trades/me?page=${page}&pageSize=${pageSize}`);
+        const { data } = await this.client.get(`/v1/trades/me`, {
+            params: {
+                page,
+                pageSize
+            }
+        });
         return data;
     }
     async getTransactionById(transactionId) {
         const { data } = await this.client.get(`/v1/transactions/${transactionId}`);
         return data;
     }
-    async getTradeById(tradeId) {
-        const trades = await this.getTradeHistory();
-        return trades.find((x) => x.id === tradeId);
-    }
+    //async getTradeById(tradeId: string) {
+    // const trades = await this.getTradeHistory();
+    // return trades.find((x) => x.id === tradeId);
+    //}
     async getCurrencyByCode(code) {
         const currencies = await this.getCurrencies();
         return currencies.find((x) => x.code === code);
