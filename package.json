@@ -2,7 +2,7 @@
   "name": "obiex-api",
   "version": "1.0.0",
   "description": "Obiex Node.js API client",
-  "main": "dist/index.js",
+  "main": "index.ts",
   "scripts": {
     "build": "rm -rf dist && tsc",
     "prepare": "husky install"
