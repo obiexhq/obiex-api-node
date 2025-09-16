@@ -17,6 +17,7 @@ import {
   BankDepositRequest,
   FiatBankAccount,
   NairaPayment,
+  ActiveNetworkCurrencyMap,
 } from "./types";
 import { TransactionCategory } from "./enums/TransactionCategory";
 
@@ -46,13 +47,13 @@ export class ObiexClient {
             new ServerError(
               error.response.message,
               error.response.data,
-              error.response.status
-            )
+              error.response.status,
+            ),
           );
         }
 
         return Promise.reject(error);
-      }
+      },
     );
 
     this.cacheService = new CacheService();
@@ -101,7 +102,7 @@ export class ObiexClient {
   async getDepositAddress(
     currency: string,
     network: string,
-    identifier: string
+    identifier: string,
   ) {
     const { data: response } = await this.client.post(`/v1/addresses/broker`, {
       currency,
@@ -120,9 +121,8 @@ export class ObiexClient {
   }
 
   async getTradePairs() {
-    const { data: response } = await this.client.get<Response<TradePair[]>>(
-      "/v1/trades/pairs"
-    );
+    const { data: response } =
+      await this.client.get<Response<TradePair[]>>("/v1/trades/pairs");
 
     return response.data.map((x) => ({
       id: x.id,
@@ -135,7 +135,7 @@ export class ObiexClient {
 
   async getTradePairsByCurrency(currencyId: string) {
     const { data: response } = await this.client.get<Response<TradePair[]>>(
-      `/v1/currencies/${currencyId}/pairs`
+      `/v1/currencies/${currencyId}/pairs`,
     );
 
     return response.data.map((x) => ({
@@ -159,7 +159,7 @@ export class ObiexClient {
     source: string,
     target: string,
     side: "BUY" | "SELL",
-    amount: number
+    amount: number,
   ) {
     const sourceCurrency = await this.getCurrencyByCode(source);
     const targetCurrency = await this.getCurrencyByCode(target);
@@ -195,7 +195,7 @@ export class ObiexClient {
     source: string,
     target: string,
     side: "BUY" | "SELL",
-    amount: number
+    amount: number,
   ) {
     const quote = await this.createQuote(source, target, side, amount);
 
@@ -218,7 +218,7 @@ export class ObiexClient {
   async withdrawCrypto(
     currencyCode: string,
     amount: number,
-    wallet: CryptoAccountPayout
+    wallet: CryptoAccountPayout,
   ) {
     const { data: response } = await this.client.post(
       `/v1/wallets/ext/debit/crypto`,
@@ -226,7 +226,7 @@ export class ObiexClient {
         amount,
         currency: currencyCode,
         destination: wallet,
-      }
+      },
     );
 
     return response.data;
@@ -239,7 +239,7 @@ export class ObiexClient {
         amount,
         currency: "NGNX",
         destination: account,
-      }
+      },
     );
 
     return response.data;
@@ -247,7 +247,7 @@ export class ObiexClient {
 
   async getBanks() {
     const { data: response } = await this.client.get<Response<Banks[]>>(
-      "/v1/ngn-payments/banks"
+      "/v1/ngn-payments/banks",
     );
 
     return response.data;
@@ -257,9 +257,8 @@ export class ObiexClient {
     return await this.cacheService.getOrSet(
       "currencies",
       async () => {
-        const { data: response } = await this.client.get<Response<Currency[]>>(
-          "/v1/currencies"
-        );
+        const { data: response } =
+          await this.client.get<Response<Currency[]>>("/v1/currencies");
 
         return response.data.map((x) => ({
           id: x.id,
@@ -273,7 +272,7 @@ export class ObiexClient {
           maximumDecimalPlaces: x.maximumDecimalPlaces,
         }));
       },
-      86400 // 24 Hours
+      86400, // 24 Hours
     );
   }
 
@@ -285,8 +284,19 @@ export class ObiexClient {
     const currency = await this.getCurrencyByCode(currencyCode);
 
     const { data: response } = await this.client.get<Response<Network[]>>(
-      `/v1/currencies/${currency.id}/networks`
+      `/v1/currencies/${currency.id}/networks`,
     );
+
+    return response.data;
+  }
+
+  /**
+   * @returns
+   */
+  async getActiveNetworks() {
+    const { data: response } = await this.client.get<
+      Response<ActiveNetworkCurrencyMap>
+    >(`/v1/currencies/networks/active`);
 
     return response.data;
   }
@@ -305,7 +315,7 @@ export class ObiexClient {
           page,
           pageSize,
         },
-      }
+      },
     );
 
     return response.data;
@@ -321,7 +331,7 @@ export class ObiexClient {
   async getTransactionHistory(
     page = 1,
     pageSize = 30,
-    category?: TransactionCategory
+    category?: TransactionCategory,
   ) {
     const { data } = await this.client.get(`/v1/transactions/me`, {
       params: {
@@ -365,7 +375,7 @@ export class ObiexClient {
 
   async getOrCreateWallet(currencyCode: string): Promise<Wallet> {
     const { data: response } = await this.client.get(
-      `/v1/wallets/${currencyCode}`
+      `/v1/wallets/${currencyCode}`,
     );
 
     return response.data.map((x: Wallet) => ({
@@ -409,7 +419,7 @@ export class ObiexClient {
       {
         merchantCode,
         amount,
-      }
+      },
     );
 
     return response.data;
@@ -422,7 +432,7 @@ export class ObiexClient {
    */
   async verifyNairaDeposit(reference: string) {
     const { data: response } = await this.client.put(
-      `/v1/ngn-payments/deposits/${reference}`
+      `/v1/ngn-payments/deposits/${reference}`,
     );
 
     return response.data;
@@ -435,7 +445,7 @@ export class ObiexClient {
    */
   async verifyNairaWithdrawal(reference: string) {
     const { data: response } = await this.client.put(
-      `/v1/ngn-payments/withdrawals/${reference}`
+      `/v1/ngn-payments/withdrawals/${reference}`,
     );
 
     return response.data;

@@ -329,6 +329,37 @@ console.log(await client.getNetworks('BTC');
 ```
 </details>
 
+#### getActiveNetworks
+
+```js
+console.log(await client.getActiveNetworks());
+```
+
+<details>
+<summary>Output</summary>
+
+```js
+  {
+    [CURRENCY_CODE]: {
+      currencyName: String,
+      networks: [
+        {
+          networkName: String,
+          networkCode: String,
+          minimumDeposit: Number,
+          depositFee: Number,
+          minimumWithdrawal: Number,
+          withdrawalFee: Number,
+          maximumDecimalPlaces: Number,
+          receiveFeeType: String,
+          withdrawalFeeType: String,
+        }
+      ]
+    }
+  } 
+```
+</details>
+
 #### getNairaMerchants
 
 ```js

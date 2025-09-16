@@ -172,8 +172,7 @@ class ObiexClient {
                 maximumDailyDeposit: x.maximumDailyDepositLimit,
                 maximumDecimalPlaces: x.maximumDecimalPlaces,
             }));
-        }, 86400 // 24 Hours
-        );
+        }, 86400);
     }
     /**
      * @param currencyCode Get networks by currency code
@@ -182,6 +181,13 @@ class ObiexClient {
     async getNetworks(currencyCode) {
         const currency = await this.getCurrencyByCode(currencyCode);
         const { data: response } = await this.client.get(`/v1/currencies/${currency.id}/networks`);
+        return response.data;
+    }
+    /**
+     * @returns
+     */
+    async getActiveNetworks() {
+        const { data: response } = await this.client.get(`/v1/currencies/networks/active`);
         return response.data;
     }
     /**
