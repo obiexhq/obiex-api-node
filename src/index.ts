@@ -17,15 +17,25 @@ import {
   BankDepositRequest,
   FiatBankAccount,
   NairaPayment,
+  DepositAddress,
+  TradableCurrency,
+  GhsBank,
+  GhsMobileNetwork,
+  TradesSummary,
+  TransactionFilter,
+  CreateInvoiceRequest,
+  Invoice,
+  InvoiceFilter,
 } from "./types";
 import { TransactionCategory } from "./enums/TransactionCategory";
+import FormData from "form-data";
 
 export class ObiexClient {
-  private client: AxiosInstance;
-  private apiKey: string;
-  private apiSecret: string;
+  private readonly client: AxiosInstance;
+  private readonly apiKey: string;
+  private readonly apiSecret: string;
 
-  private cacheService: CacheService;
+  private readonly cacheService: CacheService;
 
   constructor({ apiKey, apiSecret, sandboxMode = false }: Options) {
     this.apiKey = apiKey;
@@ -46,13 +56,13 @@ export class ObiexClient {
             new ServerError(
               error.response.message,
               error.response.data,
-              error.response.status
-            )
+              error.response.status,
+            ),
           );
         }
 
         return Promise.reject(error);
-      }
+      },
     );
 
     this.cacheService = new CacheService();
@@ -101,7 +111,7 @@ export class ObiexClient {
   async getDepositAddress(
     currency: string,
     network: string,
-    identifier: string
+    identifier: string,
   ) {
     const { data: response } = await this.client.post(`/v1/addresses/broker`, {
       currency,
@@ -120,9 +130,8 @@ export class ObiexClient {
   }
 
   async getTradePairs() {
-    const { data: response } = await this.client.get<Response<TradePair[]>>(
-      "/v1/trades/pairs"
-    );
+    const { data: response } =
+      await this.client.get<Response<TradePair[]>>("/v1/trades/pairs");
 
     return response.data.map((x) => ({
       id: x.id,
@@ -135,7 +144,7 @@ export class ObiexClient {
 
   async getTradePairsByCurrency(currencyId: string) {
     const { data: response } = await this.client.get<Response<TradePair[]>>(
-      `/v1/currencies/${currencyId}/pairs`
+      `/v1/currencies/${currencyId}/pairs`,
     );
 
     return response.data.map((x) => ({
@@ -159,7 +168,7 @@ export class ObiexClient {
     source: string,
     target: string,
     side: "BUY" | "SELL",
-    amount: number
+    amount: number,
   ) {
     const sourceCurrency = await this.getCurrencyByCode(source);
     const targetCurrency = await this.getCurrencyByCode(target);
@@ -180,6 +189,11 @@ export class ObiexClient {
       amount: data.amount,
       expiryDate: data.expiryDate,
       amountReceived: data.amountReceived,
+      sourceCurrency: sourceCurrency.code,
+      targetCurrency: targetCurrency.code,
+      sourceId: sourceCurrency.id,
+      targetId: targetCurrency.id,
+      expiresIn: data.expiresIn,
     }; // satisfies Quote;
   }
 
@@ -195,7 +209,7 @@ export class ObiexClient {
     source: string,
     target: string,
     side: "BUY" | "SELL",
-    amount: number
+    amount: number,
   ) {
     const quote = await this.createQuote(source, target, side, amount);
 
@@ -218,7 +232,7 @@ export class ObiexClient {
   async withdrawCrypto(
     currencyCode: string,
     amount: number,
-    wallet: CryptoAccountPayout
+    wallet: CryptoAccountPayout,
   ) {
     const { data: response } = await this.client.post(
       `/v1/wallets/ext/debit/crypto`,
@@ -226,28 +240,32 @@ export class ObiexClient {
         amount,
         currency: currencyCode,
         destination: wallet,
-      }
+      },
     );
 
     return response.data;
   }
 
-  async withdrawNaira(amount: number, account: BankAccountPayout) {
+  async withdrawFiat(
+    amount: number,
+    currency: string,
+    account: BankAccountPayout,
+  ) {
     const { data: response } = await this.client.post(
       `/v1/wallets/ext/debit/fiat`,
       {
         amount,
-        currency: "NGNX",
+        currency,
         destination: account,
-      }
+      },
     );
 
     return response.data;
   }
 
-  async getBanks() {
+  async getNGNBanks() {
     const { data: response } = await this.client.get<Response<Banks[]>>(
-      "/v1/ngn-payments/banks"
+      "/v1/ngn-payments/banks",
     );
 
     return response.data;
@@ -257,9 +275,8 @@ export class ObiexClient {
     return await this.cacheService.getOrSet(
       "currencies",
       async () => {
-        const { data: response } = await this.client.get<Response<Currency[]>>(
-          "/v1/currencies"
-        );
+        const { data: response } =
+          await this.client.get<Response<Currency[]>>("/v1/currencies");
 
         return response.data.map((x) => ({
           id: x.id,
@@ -273,7 +290,7 @@ export class ObiexClient {
           maximumDecimalPlaces: x.maximumDecimalPlaces,
         }));
       },
-      86400 // 24 Hours
+      86400, // 24 Hours
     );
   }
 
@@ -285,7 +302,7 @@ export class ObiexClient {
     const currency = await this.getCurrencyByCode(currencyCode);
 
     const { data: response } = await this.client.get<Response<Network[]>>(
-      `/v1/currencies/${currency.id}/networks`
+      `/v1/currencies/${currency.id}/networks`,
     );
 
     return response.data;
@@ -305,7 +322,7 @@ export class ObiexClient {
           page,
           pageSize,
         },
-      }
+      },
     );
 
     return response.data;
@@ -318,11 +335,15 @@ export class ObiexClient {
    * @param category TransactionCategory
    * @returns
    */
-  async getTransactionHistory(
+  async getTransactionHistory({
     page = 1,
     pageSize = 30,
-    category?: TransactionCategory
-  ) {
+    category,
+  }: {
+    page?: number;
+    pageSize?: number;
+    category?: TransactionCategory;
+  }) {
     const { data } = await this.client.get(`/v1/transactions/me`, {
       params: {
         page,
@@ -365,7 +386,7 @@ export class ObiexClient {
 
   async getOrCreateWallet(currencyCode: string): Promise<Wallet> {
     const { data: response } = await this.client.get(
-      `/v1/wallets/${currencyCode}`
+      `/v1/wallets/${currencyCode}`,
     );
 
     return response.data.map((x: Wallet) => ({
@@ -409,7 +430,7 @@ export class ObiexClient {
       {
         merchantCode,
         amount,
-      }
+      },
     );
 
     return response.data;
@@ -422,7 +443,7 @@ export class ObiexClient {
    */
   async verifyNairaDeposit(reference: string) {
     const { data: response } = await this.client.put(
-      `/v1/ngn-payments/deposits/${reference}`
+      `/v1/ngn-payments/deposits/${reference}`,
     );
 
     return response.data;
@@ -435,7 +456,7 @@ export class ObiexClient {
    */
   async verifyNairaWithdrawal(reference: string) {
     const { data: response } = await this.client.put(
-      `/v1/ngn-payments/withdrawals/${reference}`
+      `/v1/ngn-payments/withdrawals/${reference}`,
     );
 
     return response.data;
@@ -459,6 +480,298 @@ export class ObiexClient {
 
     return response.data;
   }
+
+  /**
+   * Get all broker deposit addresses for the authenticated user
+   */
+  async getDepositAddresses() {
+    const { data: response } = await this.client.get<
+      Response<DepositAddress[]>
+    >(`/v1/addresses/me/broker`);
+
+    return response.data;
+  }
+
+  /**
+   * Create deposit address for the authenticated user
+   */
+  async createDepositAddress({
+    currency,
+    network,
+    uniqueUserIdentifier,
+  }: {
+    currency: string;
+    network: string;
+    uniqueUserIdentifier: string;
+  }): Promise<DepositAddress> {
+    const { data: response } = await this.client.post<Response<DepositAddress>>(
+      `/v1/addresses/broker`,
+      {
+        currency,
+        network,
+        uniqueUserIdentifier,
+      },
+    );
+
+    return response.data;
+  }
+
+  /**
+   * Get a single trade pair by source and target currency codes
+   * @param sourceCode e.g. "USDT"
+   * @param targetCode e.g. "NGNX"
+   */
+  async getTradePair(sourceCode: string, targetCode: string) {
+    const { data: response } = await this.client.get<Response<TradePair>>(
+      `/v1/trades/pairs/${sourceCode}/${targetCode}`,
+    );
+
+    return response.data;
+  }
+
+  /**
+   * Get user's trade volume summary
+   * @param currencyId Optional currency ID to filter by
+   * @param page number
+   * @param pageSize number
+   */
+  async getUserTradesSummary(
+    currencyId?: string,
+    page = 1,
+    pageSize = 30,
+  ): Promise<TradesSummary> {
+    const { data: response } = await this.client.get<Response<TradesSummary>>(
+      `/v1/trades/summary/me`,
+      {
+        params: {
+          currencyId,
+          page,
+          pageSize,
+        },
+      },
+    );
+
+    return response.data;
+  }
+
+  /**
+   * Get all tradeable currencies with their associated pairs
+   */
+  async getTradableCurrencies() {
+    const { data: response } = await this.client.get<
+      Response<TradableCurrency[]>
+    >(`/v1/currencies/tradeable`);
+
+    return response.data;
+  }
+
+  /**
+   * Get all wallets for the authenticated user
+   */
+  async getWallets(): Promise<Wallet[]> {
+    const { data: response } =
+      await this.client.get<Response<Wallet[]>>(`/v1/wallets/me`);
+
+    return response.data;
+  }
+
+  /**
+   * Get the wallet balance for a specific currency
+   * @param currencyCode e.g. "USDT", "BTC"
+   */
+  async getWalletBalance(currencyCode: string): Promise<Wallet> {
+    const { data: response } = await this.client.get<Response<Wallet>>(
+      `/v1/wallets/${currencyCode}`,
+    );
+
+    return response.data;
+  }
+
+  /**
+   * Get list of banks available for GHS (Ghana Cedis) withdrawal
+   */
+  async getGhsBanks() {
+    const { data: response } = await this.client.get<Response<GhsBank[]>>(
+      `/v1/ghs-payments/banks`,
+    );
+
+    return response.data;
+  }
+
+  /**
+   * Get list of mobile money networks available for GHS withdrawal
+   */
+  async getGhsMobileNetworks() {
+    const { data: response } = await this.client.get<
+      Response<GhsMobileNetwork[]>
+    >(`/v1/ghs-payments/mobile/networks`);
+
+    return response.data;
+  }
+
+  /**
+   * Resolve a GHS bank account or mobile money number
+   * @param bankCode Bank sort code or mobile network code e.g. "VOD", "MTN"
+   * @param accountNumber Account or phone number
+   */
+  async resolveGhsBankAccount(bankCode: string, accountNumber: string) {
+    const { data: response } = await this.client.get<Response<FiatBankAccount>>(
+      `/v1/ghs-payments/accounts/resolve`,
+      {
+        params: {
+          bankCode,
+          accountNumber,
+        },
+      },
+    );
+
+    return response.data;
+  }
+
+  /**
+   * Get deposit (incoming) transactions for the authenticated user
+   */
+  async getDepositTransactions({
+    page = 1,
+    pageSize = 30,
+    currencyId,
+    status,
+    startDate,
+    endDate,
+  }: TransactionFilter = {}) {
+    const { data } = await this.client.get(`/v1/transactions/deposits/me`, {
+      params: {
+        page,
+        pageSize,
+        currencyId,
+        status,
+        startDate,
+        endDate,
+      },
+    });
+
+    return data;
+  }
+
+  /**
+   * Get payout (withdrawal) transactions for the authenticated user
+   */
+  async getPayoutTransactions({
+    page = 1,
+    pageSize = 30,
+    currencyId,
+    status,
+    startDate,
+    endDate,
+  }: TransactionFilter = {}) {
+    const { data } = await this.client.get(`/v1/transactions/withdrawals/me`, {
+      params: {
+        page,
+        pageSize,
+        currencyId,
+        status,
+        startDate,
+        endDate,
+      },
+    });
+
+    return data;
+  }
+
+  /**
+   * Resend webhook for a single transaction
+   * @param transactionId The transaction ID
+   */
+  async resendWebhook(transactionId: string) {
+    await this.client.post(`/v1/transactions/${transactionId}/resendWebhook`);
+
+    return true;
+  }
+
+  /**
+   * Resend webhooks for multiple transactions
+   * @param transactionIds Array of transaction IDs
+   */
+  async resendWebhooks(transactionIds: string[]) {
+    await this.client.post(`/v1/transactions/resendWebhooks`, {
+      ids: transactionIds,
+    });
+
+    return true;
+  }
+
+  async getActiveNetworks() {
+    const { data: response } = await this.client.get<Response<Banks[]>>(
+      "/v1/currencies/networks/active",
+    );
+
+    return response.data;
+  }
+
+  /**
+   * Upload an invoice document (JPEG, PNG, or PDF, max 1 MB).
+   * Returns a URL to pass into createInvoice.
+   * @param file A Buffer or Readable stream of the file
+   * @param filename Original filename e.g. "invoice.pdf"
+   * @param mimeType e.g. "application/pdf", "image/jpeg", "image/png"
+   */
+  async uploadInvoiceDocument(
+    file: Buffer | NodeJS.ReadableStream,
+    filename: string,
+    mimeType: string,
+  ): Promise<string> {
+    const form = new FormData();
+    form.append("file", file, { filename, contentType: mimeType });
+
+    const { data: response } = await this.client.post(
+      `/v1/uploads/invoices`,
+      form,
+      { headers: form.getHeaders() },
+    );
+
+    return response.data.url;
+  }
+
+  /**
+   * Create an invoice for USD settlement.
+   * Returns a virtual NGN bank account to pay into (valid for 30 minutes).
+   */
+  async createInvoice(payload: CreateInvoiceRequest) {
+    const { data: response } = await this.client.post<Response<Invoice>>(
+      `/v1/invoices`,
+      payload,
+    );
+
+    return response.data;
+  }
+
+  /**
+   * Get a paginated list of your invoices.
+   */
+  async getInvoices({
+    status,
+    startDate,
+    endDate,
+    page = 1,
+    pageSize = 30,
+  }: InvoiceFilter = {}) {
+    const { data } = await this.client.get(`/v1/invoices/me`, {
+      params: { status, startDate, endDate, page, pageSize },
+    });
+
+    return data;
+  }
+
+  /**
+   * Get a single invoice by ID.
+   */
+  async getInvoiceById(invoiceId: string): Promise<Invoice> {
+    const { data: response } = await this.client.get<Response<Invoice>>(
+      `/v1/invoices/${invoiceId}`,
+    );
+
+    return response.data;
+  }
 }
 
 export { ServerError } from "./errors/server";
@@ -479,4 +792,14 @@ export {
   Banks,
   BankDepositRequest,
   FiatBankAccount,
+  DepositAddress,
+  TradableCurrency,
+  GhsBank,
+  GhsMobileNetwork,
+  TradesSummary,
+  TransactionFilter,
+  CreateInvoiceRequest,
+  Invoice,
+  InvoiceFilter,
+  InvoiceStatus,
 } from "./types";

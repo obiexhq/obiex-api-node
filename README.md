@@ -1,517 +1,258 @@
-# Obiex Node API Wrapper
+# obiex-api-node
 
-> An API wrapper for the [Obiex](https://obiex.com) API.
+An API wrapper for the [Obiex](https://obiex.finance) API. Build crypto payment experiences — collections, payouts, trading, invoice settlement — with a simple, typed interface.
 
-### Installation
+## Requirements
 
-    npm install obiexhq/obiex-api-node
+- Node.js 16+
+- An Obiex API key and secret ([sign up](https://obiex.finance) or use the [staging environment](https://staging.app.obiex.finance/auth/signup) for testing)
 
-### Getting started
+## Installation
 
-Import the client module and create a new client. Passing sandbox mode is optional and it's false by default. The sandbox mode determines if you want to use the Obiex staging or production server. Setting sandbox as true uses the staging server.
+```bash
+npm install obiex-api
+```
 
-```js
-import { ObiexClient } from 'obiex-api-node'
+## Quick Start
 
-// Authenticated client, can make signed calls
+```ts
+import { ObiexClient } from 'obiex-api';
+
 const client = new ObiexClient({
-  apiKey: 'xxx',
-  apiSecret: 'xxx',
-  sandboxMode: xxx,
-})
+  apiKey: 'your-api-key',
+  apiSecret: 'your-api-secret',
+  sandboxMode: true, // use false in production
+});
 
+// Get a deposit address
+const address = await client.getDepositAddress('USDT', 'TRX', 'user-123');
+
+// Swap currencies
+const quote = await client.createQuote('USDT', 'BTC', 'BUY', 100);
+await client.acceptQuote(quote.id);
 ```
 
-### Table of Contents
-- [Initialization](#Initialization)
-- [Public REST Endpoints](#public-rest-endpoints)
-  - [Get trade history](#getTradeHistory)
-- [ServerErrors](#ServerErrors)
+## Environments
 
-### Initialization
+| Environment | `sandboxMode` | Base URL |
+|---|---|---|
+| Staging | `true` | `https://staging.api.obiex.finance` |
+| Production | `false` | `https://api.obiex.finance` |
 
-| Param       | Type     | Required | Info                                         |
-| ----------- | -------- | -------- | -------------------------------------------- |
-| apiKey      | String   | false    | Required when making private calls           |
-| apiSecret   | String   | false    | Required when making private calls           |
-| sandboxMode   | Function | false    | Required to be true in development/test enviroment        |
+Use staging for all development and testing — no real funds are involved.
 
-### Public REST Endpoints
+## Authentication
 
-#### getTradeHistory
+All requests are signed automatically using your API key and secret. You can generate credentials from your Obiex dashboard under **API Keys**.
 
-```js
-console.log(await client.getTradePairs())
-```
-
-<details>
-<summary>Output</summary>
-
-```js
-[
-  {
-    id: 'be3854e1-b675-4ace-877e-32caeb582dc5',
-    isSellable: true;
-    isBuyable: true;
-    source: {
-        id: 'de3854e1-b675-5ace-977e-32caeb582dc5',
-        name: 'string';
-        code: 'BTC';
-        receivable: true;
-        withdrawable: true;
-        transferrable: boolean;
-        minimumDeposit: 10;
-        maximumDeposit: 10000;
-        maximumDailyDepositLimit: 100;
-        maximumDecimalPlaces: 8;
-    },
-    target: {
-        id: 'ae3854e1-b675-4dee-977e-62caeb582dd2',
-        name: 'string';
-        code: 'NGNX';
-        receivable: true;
-        withdrawable: true;
-        transferrable: boolean;
-        minimumDeposit: 100;
-        maximumDeposit: 100000;
-        maximumDailyDepositLimit: 1000;
-        maximumDecimalPlaces: 2;
-    },;
-  }
-]
-```
-
-</details>
-
-#### getDepositAddress
-
-```js
-console.log(await client.getDepositAddress('USDT', 'TRX', 'wallet for spending'))
-```
-
-| Param  | Type   | Required | Default |
-| ------ | ------ | -------- | ------- |
-| currency | String | true    |         |
-| network | String | true    |         |
-| identifier | String | true    |         |
-
-<details>
-<summary>Output</summary>
-
-```js
-  {
-    address: 'string',
-    memo: 'string',
-    network: 'string',
-    identifier: 'purpose',
-  }
-```
-</details>
-
-#### getTradePairsByCurrency
-
-```js
-console.log(await client.getTradePairsByCurrency('3854e1-b675-5ace-977e-32caeb582'))
-```
-
-| Param  | Type   | Required | Default |
-| ------ | ------ | -------- | ------- |
-| currencyId | String | true    |         |
-
-<details>
-<summary>Output</summary>
-
-```js
-[
-  {
-    id: 'be3854e1-b675-4ace-877e-32caeb582dc5',
-    isSellable: true;
-    isBuyable: true;
-    source: {
-        id: 'de3854e1-b675-5ace-977e-32caeb582dc5',
-        name: 'string';
-        code: 'BTC';
-        receivable: true;
-        withdrawable: true;
-        transferrable: boolean;
-        minimumDeposit: 10;
-        maximumDeposit: 10000;
-        maximumDailyDepositLimit: 100;
-        maximumDecimalPlaces: 8;
-    },
-    target: {
-        id: 'ae3854e1-b675-4dee-977e-62caeb582dd2',
-        name: 'string';
-        code: 'NGNX';
-        receivable: true;
-        withdrawable: true;
-        transferrable: boolean;
-        minimumDeposit: 100;
-        maximumDeposit: 100000;
-        maximumDailyDepositLimit: 1000;
-        maximumDecimalPlaces: 2;
-    },;
-  }
-]
-```
-</details>
-
-#### createQuote
-
-```js
-console.log(await client.createQuote('USDT', 'BNB', 'SELL', 100))
-```
-
-| Param  | Type   | Required |
-| ------ | ------ | -------- |
-| source | String | true    |
-| target | String | true    |
-| side | String | true    |
-| amount | Number | true    |
-
-<details>
-<summary>Output</summary>
-
-```js
-  {
-    id: String,
-    rate: Number,
-    side: String,
-    amount: Number,
-    expiryDate: Date,
-    amountReceived: Number,
-  }
-```
-</details>
-
-#### trade
-
-```js
-console.log(await client.trade('USDT', 'BNB', 'SELL', 100))
-```
-
-| Param  | Type   | Required |
-| ------ | ------ | -------- |
-| source | String | true    |
-| target | String | true    |
-| side | String | true    |
-| amount | Number | true    |
-
-<details>
-<summary>Output</summary>
-
-```js
-  {
-    id: String,
-    rate: Number,
-    side: String,
-    amount: Number,
-    expiryDate: Date,
-    amountReceived: Number,
-  }
-```
-</details>
-
-#### acceptQuote
-
-```js
-console.log(await client.acceptQuote('quoteId');
-```
-
-| Param  | Type   | Required |
-| ------ | ------ | -------- |
-| quoteId | String | true    |
-
-<details>
-<summary>Output</summary>
-
-```js
-  Boolean
-```
-</details>
-
-#### withdrawCrypto
-
-```js
-console.log(await client.withdrawCrypto('BTC', 100, {
-  address: 'string';
-  network: 'string';
-  memo?: 'string';
+```ts
+const client = new ObiexClient({
+  apiKey: 'your-api-key',
+  apiSecret: 'your-api-secret',
+  sandboxMode: true,
 });
 ```
 
-| Param        | Type   | Required      |
-| ------       | ------ | --------      |
-| currencyCode | String | true    |
-| amount       | Number | true    |
-| address      | String | true    |
-| network      | String | true    |
-| memo         | String | false   |
+| Option | Type | Required | Description |
+|---|---|---|---|
+| `apiKey` | `string` | Yes | Your API key |
+| `apiSecret` | `string` | Yes | Your API secret |
+| `sandboxMode` | `boolean` | No | Defaults to `false` |
 
-#### withdrawNaira
+## API Reference
 
-```js
-console.log(await client.withdrawNaira(100, {
-  accountNumber: 'string';
-  accountName: 'string';
-  bankName: 'string';
-  bankCode: 'string';
-  merchantCode: 'string';
+### Collections (Deposit Addresses)
+
+```ts
+// Generate a deposit address for a user
+const address = await client.getDepositAddress('USDT', 'TRX', 'user-identifier');
+
+// Get all broker deposit addresses
+const addresses = await client.getDepositAddresses();
+```
+
+### Trading
+
+```ts
+// Get all trade pairs
+const pairs = await client.getTradePairs();
+
+// Get a specific pair
+const pair = await client.getTradePair('USDT', 'NGNX');
+
+// Get pairs for a currency
+const pairs = await client.getTradePairsByCurrency(currencyId);
+
+// Get tradeable currencies (with their pairs)
+const currencies = await client.getTradableCurrencies();
+
+// Create a quote (locks in a rate for 30 seconds)
+const quote = await client.createQuote('USDT', 'BTC', 'BUY', 100);
+
+// Accept a quote
+await client.acceptQuote(quote.id);
+
+// Swap in one step (creates and accepts a quote)
+await client.trade('USDT', 'BTC', 'BUY', 100);
+// or equivalently:
+await client.directSwap('USDT', 'BTC', 'BUY', 100);
+
+// Get trade history
+const history = await client.getTradeHistory(1, 30);
+
+// Get trade volume summary
+const summary = await client.getUserTradesSummary();
+```
+
+### Wallets
+
+```ts
+// Get wallet balance for a specific currency
+const wallet = await client.getWalletBalance('USDT');
+
+// Get all wallets
+const wallets = await client.getWallets();
+```
+
+### Payouts (Withdrawals)
+
+```ts
+// Withdraw crypto
+await client.withdrawCrypto('BTC', 0.001, {
+  address: 'bc1q...',
+  network: 'BTC',
 });
+
+// Withdraw NGN to a bank account
+await client.withdrawNaira(10000, {
+  accountNumber: '0123456789',
+  accountName: 'John Doe',
+  bankName: 'GTBank',
+  bankCode: '058',
+  merchantCode: 'merchant-code',
+});
+
+// NGN bank helpers
+const banks = await client.getBanks();
+const resolved = await client.resolveNairaBankAccount(bankId, accountNumber);
+
+// GHS bank helpers
+const ghsBanks = await client.getGhsBanks();
+const mobileNetworks = await client.getGhsMobileNetworks();
+const resolvedGhs = await client.resolveGhsBankAccount('VOD', '0207333672');
 ```
 
-| Param         | Type   | Required      |
-| ------        | ------ | --------      |
-| amount        | Number | true    |
-| accountNumber | String | true    |
-| accountName   | String | true    |
-| bankName      | String | true   |
-| bankCode      | String | true   |
-| merchantCode  | String | true   |
+### NGN Deposits
 
+```ts
+// Get a virtual bank account to deposit NGN into
+const merchants = await client.getNairaMerchants();
+const payment = await client.requestNairaDepositBankAccount({
+  merchantCode: merchants[0].code,
+  amount: 50000,
+});
 
-#### getBanks
-
-```js
-console.log(await client.getBanks();
+// Verify a deposit or withdrawal
+await client.verifyNairaDeposit(reference);
+await client.verifyNairaWithdrawal(reference);
 ```
 
-#### getCurrencies
+### Currencies & Networks
 
-```js
-console.log(await client.getCurrencies();
+```ts
+// Get all supported currencies
+const currencies = await client.getCurrencies();
+
+// Find a currency by code
+const usdt = await client.getCurrencyByCode('USDT');
+
+// Get withdrawal networks for a currency
+const networks = await client.getNetworks('USDT');
 ```
 
-<details>
-<summary>Output</summary>
+### Transactions
 
-```js
-  [
-    {
-      id: String,
-      name: String,
-      code: String,
-      receivable: Boolean,
-      withdrawable: Boolean,
-      transferrable: Boolean,
-      minimumDeposit: Number,
-      maximumDailyDeposit: Number,
-      maximumDecimalPlaces: Number,
-    }
-  ]
-```
-</details>
+```ts
+// All transactions
+const transactions = await client.getTransactionHistory(1, 30, TransactionCategory.DEPOSIT);
 
-#### getNetworks
+// Deposits only
+const deposits = await client.getDepositTransactions({ page: 1, pageSize: 30 });
 
-```js
-console.log(await client.getNetworks('BTC');
+// Withdrawals only
+const payouts = await client.getPayoutTransactions({
+  status: 'COMPLETED',
+  startDate: '2025-01-01',
+  endDate: '2025-06-01',
+});
+
+// Single transaction
+const transaction = await client.getTransactionById(transactionId);
+
+// Resend webhooks
+await client.resendWebhook(transactionId);
+await client.resendWebhooks([id1, id2, id3]);
 ```
 
-| Param         | Type   | Required |
-| ------        | ------ | -------- |
-| currencyCode  | String | true     |
+### Invoice Settlement
 
-<details>
-<summary>Output</summary>
+Settle USD invoices by having payers fund a virtual NGN account.
 
-```js
-  [
-    {
-      id: String;
-      name: String;
-      code: String;
-      memoRegex: String;
-      addressRegex: String;
-      minimumConfirmations: Number;
-    }
-  ]
+```ts
+// 1. Upload the invoice document (JPEG, PNG, or PDF — max 1 MB)
+const docUrl = await client.uploadInvoiceDocument(
+  fs.readFileSync('./invoice.pdf'),
+  'invoice.pdf',
+  'application/pdf'
+);
+
+// 2. Create the invoice — returns a virtual NGN account valid for 30 minutes
+const invoice = await client.createInvoice({
+  targetAmount: 1000,       // amount in target currency
+  source: 'NGN',
+  target: 'USD',
+  purposeOfPayment: 'Payment for software services',
+  invoiceDocument: docUrl,
+  destination: {
+    accountName: 'Acme Corp',
+    accountNumber: '12345678901',
+    swiftCode: 'FIBKUS33XXX',
+    bankName: 'First International Bank',
+    bankCode: 'FIBK',
+    bankCountry: 'US',
+    bankAddress: '123 Main Street, New York, NY 10001',
+    beneficiaryName: 'Acme Corp',
+    beneficiaryAddress: '456 Business Ave, San Francisco, CA 94105',
+    beneficiaryCountryCode: 'US',
+    beneficiaryCountryOfResidence: 'United States',
+  },
+});
+
+
+// 3. Retrieve invoices
+const invoices = await client.getInvoices({ status: 'PENDING', page: 1 });
+const single = await client.getInvoiceById(invoice.id);
 ```
-</details>
 
-#### getNairaMerchants
+## Error Handling
 
-```js
-console.log(await client.getNairaMerchants(1, 30);
-```
+Failed requests throw a `ServerError` with the API's response details:
 
-| Param     | Type   | Required |
-| ------    | ------ | -------- |
-| page      | Number | false    |
-| pageSize  | Number | false    |
+```ts
+import { ServerError } from 'obiex-api';
 
-<details>
-
-```js
-  [
-    {
-      id: string;
-      createdAt: string;
-      updatedAt: string;
-      active: boolean;
-      code: string;
-      depositFee: number;
-      payoutFee: number;
-      userId: string;
-      user: {
-        id: string;
-        createdAt: string;
-        updatedAt: string;
-        active: boolean;
-        firstName: string;
-        lastName: string;
-        email: string;
-        role: string;
-      };
-      totalRequests: number;
-      completedRequests: number;
-    }
-  ]
-```
-</details>
-#### getTransactionHistory
-
-```js
-console.log(await client.getTransactionHistory(1, 30, 'DEPOSIT');
-
-enum TransactionCategory {
-  DEPOSIT = "DEPOSIT",
-  WITHDRAWAL = "WITHDRAWAL",
-  SWAP = "SWAP",
-  TRANSFER = "TRANSFER",
+try {
+  await client.withdrawCrypto('BTC', 999999, { address: '...', network: 'BTC' });
+} catch (err) {
+  if (err instanceof ServerError) {
+    console.log(err.statusCode); // e.g. 400
+    console.log(err.data);       // API error payload
+  }
 }
 ```
 
-| Param                | Type   | Required |
-| -------------------  | ------ | -------- |
-| page                 | Number | false    |
-| pageSize             | Number | false    |
-| transactionCategory  | Enum   | false     |
+## Links
 
-#### getOrCreateWallet
-
-```js
-console.log(await client.getOrCreateWallet('NGNX');
-```
-
-| Param         | Type   | Required |
-| ------        | ------ | -------- |
-| currencyCode  | String | true    |
-
-#### getTradeHistory
-
-```js
-console.log(await client.getTradeHistory(1, 30);
-```
-
-| Param     | Type   | Required |
-| ------    | ------ | -------- |
-| page      | Number | false    |
-| pageSize  | Number | false    |
-
-#### getTransactionById
-
-```js
-console.log(await client.getTransactionById('3854e1-b675-5ace-977e-32caeb582');
-```
-
-| Param           | Type   | Required |
-| ------          | ------ | -------- |
-| transactionId   | String | true    |
-
-
-#### getCurrencyByCode
-
-```js
-console.log(await client.getCurrencyByCode('ETH');
-```
-
-| Param  | Type   | Required |
-| ------ | ------ | -------- |
-| code   | String | true    |
-
-<details>
-<summary>Output</summary>
-
-```js
-  {
-    id: String,
-    name: String,
-    code: String,
-    receivable: Boolean,
-    withdrawable: Boolean,
-    transferrable: Boolean,
-    minimumDeposit: Number,
-    maximumDailyDeposit: Number,
-    maximumDecimalPlaces: Number,
-  }
-```
-</details>
-
-#### requestNairaDepositBankAccount
-
-```js
-console.log(await client.requestNairaDepositBankAccount('AAA', 10000);
-```
-
-| Param          | Type   | Required | Description |
-| ------         | ------ | -------- |  --------   |
-| merchantCode   | String | true     |  This is code gotten from fetching getNairaMerchants()  |
-| amount         | Number | true     |
-
-
-#### verifyNairaDeposit
-
-```js
-console.log(await client.verifyNairaDeposit('ae3854e1-b675-4dee-977e-62caeb582dd2');
-```
-
-| Param      | Type   | Required |
-| ------     | ------ | -------- |
-| reference  | String | true     |
-
-
-#### verifyNairaWithdrawal
-
-```js
-console.log(await client.verifyNairaWithdrawal('ae3854e1-b675-4dee-977e-62caeb582dd2');
-```
-
-| Param      | Type   | Required |
-| ------     | ------ | -------- |
-| reference  | String | true     |
-
-
-#### resolveNairaBankAccount
-
-```js
-console.log(await client.resolveNairaBankAccount(bankId, accountNumber);
-```
-
-| Param         | Type   | Required |
-| ------------  | ------ | -------- |
-| bankId        | String | true     |
-| accountNumber | String | true     |
-
-<details>
-<summary>Output</summary>
-
-```js
-  {
-    bankId: String,
-    accountNumber: String,
-    accountName: String,
-  }
-```
-</details>
-
-### ServerErrors
-
-A server error is also being exported by the package in order for you to make readable
-conditionals upon specific errors that could occur while using the API.
-
-```js
-import { ServerError } from 'obiex-api-node'
-
-console.log(ServerError) // { message: string, data: object, statusCode: number }
-```
+- [API Documentation](https://developer.obiex.finance)
+- [Staging Sign Up](https://staging.app.obiex.finance/auth/signup)
+- [Production Sign Up](https://obiex.finance)

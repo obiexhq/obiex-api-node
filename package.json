@@ -29,6 +29,7 @@
   },
   "homepage": "https://github.com/obiexhq/obiex-api-javascript#readme",
   "devDependencies": {
+    "@types/form-data": "^2.2.1",
     "@types/node": "^18.11.18",
     "@typescript-eslint/eslint-plugin": "^5.47.0",
     "@typescript-eslint/parser": "^5.47.0",
@@ -38,6 +39,7 @@
   },
   "dependencies": {
     "axios": "^1.2.2",
+    "form-data": "^4.0.6",
     "node-cache": "^5.1.2"
   }
 }
