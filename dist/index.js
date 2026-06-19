@@ -319,9 +319,16 @@ class ObiexClient {
     }
     /**
      * Get all broker deposit addresses for the authenticated user
+     * @param page number
+     * @param pageSize number
      */
-    async getDepositAddresses() {
-        const { data: response } = await this.client.get(`/v1/addresses/me/broker`);
+    async getDepositAddresses({ page, pageSize, } = {}) {
+        const { data: response } = await this.client.get(`/v1/addresses/me/broker`, {
+            params: {
+                page,
+                pageSize,
+            },
+        });
         return response.data;
     }
     /**

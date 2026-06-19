@@ -168,8 +168,13 @@ export declare class ObiexClient {
     resolveNairaBankAccount(bankId: string, accountNumber: string): Promise<FiatBankAccount[]>;
     /**
      * Get all broker deposit addresses for the authenticated user
+     * @param page number
+     * @param pageSize number
      */
-    getDepositAddresses(): Promise<DepositAddress[]>;
+    getDepositAddresses({ page, pageSize, }?: {
+        page?: number;
+        pageSize?: number;
+    }): Promise<DepositAddress[]>;
     /**
      * Create deposit address for the authenticated user
      */

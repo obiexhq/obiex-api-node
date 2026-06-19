@@ -483,11 +483,21 @@ export class ObiexClient {
 
   /**
    * Get all broker deposit addresses for the authenticated user
+   * @param page number
+   * @param pageSize number
    */
-  async getDepositAddresses() {
+  async getDepositAddresses({
+    page,
+    pageSize,
+  }: { page?: number; pageSize?: number } = {}) {
     const { data: response } = await this.client.get<
       Response<DepositAddress[]>
-    >(`/v1/addresses/me/broker`);
+    >(`/v1/addresses/me/broker`, {
+      params: {
+        page,
+        pageSize,
+      },
+    });
 
     return response.data;
   }
