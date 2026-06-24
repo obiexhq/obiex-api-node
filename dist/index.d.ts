@@ -1,10 +1,12 @@
-import { Network, Options, BankAccountPayout, CryptoAccountPayout, Wallet, FiatMerchant, Banks, BankDepositRequest, FiatBankAccount, NairaPayment } from "./types";
+/// <reference types="node" />
+/// <reference types="node" />
+import { Network, Options, TradePair, BankAccountPayout, CryptoAccountPayout, Wallet, FiatMerchant, Banks, BankDepositRequest, FiatBankAccount, NairaPayment, DepositAddress, TradableCurrency, GhsBank, GhsMobileNetwork, TradesSummary, TransactionFilter, CreateInvoiceRequest, Invoice, InvoiceFilter } from "./types";
 import { TransactionCategory } from "./enums/TransactionCategory";
 export declare class ObiexClient {
-    private client;
-    private apiKey;
-    private apiSecret;
-    private cacheService;
+    private readonly client;
+    private readonly apiKey;
+    private readonly apiSecret;
+    private readonly cacheService;
     constructor({ apiKey, apiSecret, sandboxMode }: Options);
     private requestConfig;
     private sign;
@@ -48,6 +50,11 @@ export declare class ObiexClient {
         amount: any;
         expiryDate: any;
         amountReceived: any;
+        sourceCurrency: string;
+        targetCurrency: string;
+        sourceId: string;
+        targetId: string;
+        expiresIn: any;
     }>;
     /**
      * Swap from one currency to another (if you are not interested in verifying prices)
@@ -64,6 +71,11 @@ export declare class ObiexClient {
         amount: any;
         expiryDate: any;
         amountReceived: any;
+        sourceCurrency: string;
+        targetCurrency: string;
+        sourceId: string;
+        targetId: string;
+        expiresIn: any;
     }>;
     /**
      * Accept quote using provided quote ID
@@ -72,8 +84,8 @@ export declare class ObiexClient {
      */
     acceptQuote(quoteId: string): Promise<boolean>;
     withdrawCrypto(currencyCode: string, amount: number, wallet: CryptoAccountPayout): Promise<any>;
-    withdrawNaira(amount: number, account: BankAccountPayout): Promise<any>;
-    getBanks(): Promise<Banks[]>;
+    withdrawFiat(amount: number, currency: string, account: BankAccountPayout): Promise<any>;
+    getNGNBanks(): Promise<Banks[]>;
     getCurrencies(): Promise<{
         id: string;
         name: string;
@@ -104,7 +116,11 @@ export declare class ObiexClient {
      * @param category TransactionCategory
      * @returns
      */
-    getTransactionHistory(page?: number, pageSize?: number, category?: TransactionCategory): Promise<any>;
+    getTransactionHistory({ page, pageSize, category, }: {
+        page?: number;
+        pageSize?: number;
+        category?: TransactionCategory;
+    }): Promise<any>;
     /**
      *
      * @param page number
@@ -150,7 +166,104 @@ export declare class ObiexClient {
      * @returns FiatBankAccount
      */
     resolveNairaBankAccount(bankId: string, accountNumber: string): Promise<FiatBankAccount[]>;
+    /**
+     * Get all broker deposit addresses for the authenticated user
+     * @param page number
+     * @param pageSize number
+     */
+    getDepositAddresses({ page, pageSize, }?: {
+        page?: number;
+        pageSize?: number;
+    }): Promise<DepositAddress[]>;
+    /**
+     * Create deposit address for the authenticated user
+     */
+    createDepositAddress({ currency, network, uniqueUserIdentifier, }: {
+        currency: string;
+        network: string;
+        uniqueUserIdentifier: string;
+    }): Promise<DepositAddress>;
+    /**
+     * Get a single trade pair by source and target currency codes
+     * @param sourceCode e.g. "USDT"
+     * @param targetCode e.g. "NGNX"
+     */
+    getTradePair(sourceCode: string, targetCode: string): Promise<TradePair>;
+    /**
+     * Get user's trade volume summary
+     * @param currencyId Optional currency ID to filter by
+     * @param page number
+     * @param pageSize number
+     */
+    getUserTradesSummary(currencyId?: string, page?: number, pageSize?: number): Promise<TradesSummary>;
+    /**
+     * Get all tradeable currencies with their associated pairs
+     */
+    getTradableCurrencies(): Promise<TradableCurrency[]>;
+    /**
+     * Get all wallets for the authenticated user
+     */
+    getWallets(): Promise<Wallet[]>;
+    /**
+     * Get the wallet balance for a specific currency
+     * @param currencyCode e.g. "USDT", "BTC"
+     */
+    getWalletBalance(currencyCode: string): Promise<Wallet>;
+    /**
+     * Get list of banks available for GHS (Ghana Cedis) withdrawal
+     */
+    getGhsBanks(): Promise<GhsBank[]>;
+    /**
+     * Get list of mobile money networks available for GHS withdrawal
+     */
+    getGhsMobileNetworks(): Promise<GhsMobileNetwork[]>;
+    /**
+     * Resolve a GHS bank account or mobile money number
+     * @param bankCode Bank sort code or mobile network code e.g. "VOD", "MTN"
+     * @param accountNumber Account or phone number
+     */
+    resolveGhsBankAccount(bankCode: string, accountNumber: string): Promise<FiatBankAccount>;
+    /**
+     * Get deposit (incoming) transactions for the authenticated user
+     */
+    getDepositTransactions({ page, pageSize, currencyId, status, startDate, endDate, }?: TransactionFilter): Promise<any>;
+    /**
+     * Get payout (withdrawal) transactions for the authenticated user
+     */
+    getPayoutTransactions({ page, pageSize, currencyId, status, startDate, endDate, }?: TransactionFilter): Promise<any>;
+    /**
+     * Resend webhook for a single transaction
+     * @param transactionId The transaction ID
+     */
+    resendWebhook(transactionId: string): Promise<boolean>;
+    /**
+     * Resend webhooks for multiple transactions
+     * @param transactionIds Array of transaction IDs
+     */
+    resendWebhooks(transactionIds: string[]): Promise<boolean>;
+    getActiveNetworks(): Promise<Banks[]>;
+    /**
+     * Upload an invoice document (JPEG, PNG, or PDF, max 1 MB).
+     * Returns a URL to pass into createInvoice.
+     * @param file A Buffer or Readable stream of the file
+     * @param filename Original filename e.g. "invoice.pdf"
+     * @param mimeType e.g. "application/pdf", "image/jpeg", "image/png"
+     */
+    uploadInvoiceDocument(file: Buffer | NodeJS.ReadableStream, filename: string, mimeType: string): Promise<string>;
+    /**
+     * Create an invoice for USD settlement.
+     * Returns a virtual NGN bank account to pay into (valid for 30 minutes).
+     */
+    createInvoice(payload: CreateInvoiceRequest): Promise<Invoice>;
+    /**
+     * Get a paginated list of your invoices.
+     */
+    getInvoices({ status, startDate, endDate, page, pageSize, }?: InvoiceFilter): Promise<any>;
+    /**
+     * Get a single invoice by ID.
+     */
+    getInvoiceById(invoiceId: string): Promise<Invoice>;
 }
 export { ServerError } from "./errors/server";
 export { TransactionCategory } from "./enums/TransactionCategory";
-export { Currency, Network, Options, Quote, Response, TradePair, BankAccountPayout, CryptoAccountPayout, Wallet, FiatMerchant, Banks, BankDepositRequest, FiatBankAccount, } from "./types";
+export { Currency, Network, Options, Quote, Response, TradePair, BankAccountPayout, CryptoAccountPayout, Wallet, FiatMerchant, Banks, BankDepositRequest, FiatBankAccount, DepositAddress, TradableCurrency, GhsBank, GhsMobileNetwork, TradesSummary, TransactionFilter, CreateInvoiceRequest, Invoice, InvoiceFilter, InvoiceStatus, } from "./types";

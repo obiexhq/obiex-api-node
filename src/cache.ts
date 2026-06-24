@@ -10,7 +10,7 @@ export class CacheService {
   public async getOrSet<T>(
     key: string,
     fallback: () => Promise<T>,
-    ttlSeconds: number
+    ttlSeconds: number,
   ) {
     let data = this.nodeCache.get<T>(key);
 
